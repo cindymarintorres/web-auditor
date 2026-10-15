@@ -1,0 +1,9 @@
+# Compose lo fusiona solo con compose.yaml al correr `docker compose up`.
+# En producción NO se carga si usas: docker compose -f compose.yaml up -d
+services:
+  auditor:
+    environment:
+      # host.docker.internal = tu máquina (donde corre tu web en desarrollo)
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS},host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # en Linux hay que declararlo
