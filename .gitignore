@@ -4,3 +4,5 @@ sessions
 .env
 .git
 test
+src/application/storage/videos/*
+!src/application/storage/videos/.gitkeep

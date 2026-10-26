@@ -1,41 +1,21 @@
-ARG PLAYWRIGHT_VERSION=1.49.0
-FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy
-
-# Instalamos FFmpeg en el sistema del contenedor
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm install -g pnpm && pnpm install --frozen-lockfile --prod
-COPY src ./src
-
-
-
-ENV NODE_ENV=production
-EXPOSE 3000
-CMD ["node", "src/server.js"]
-
 # Debe coincidir EXACTO con la versión de "playwright" en package.json
 ARG PLAYWRIGHT_VERSION=1.49.0
 
 FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy AS base
 
-# Instalamos FFmpeg en el sistema del contenedor
+# Instalamos FFmpeg y actualizamos Node.js para cumplir con el requisito de pnpm (>= 22.13)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
+    nodejs \
     && rm -rf /var/lib/apt/lists/*
-    
-ENV PNPM_HOME="/pnpm" \
-    PATH="/pnpm:$PATH" \
-    COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN corepack enable
+
 WORKDIR /app
+
+RUN npm install -g pnpm@11.21.0
 
 # Todas las dependencias (para compilar)
 FROM base AS deps
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # Compila TypeScript → dist/
@@ -46,7 +26,7 @@ RUN pnpm build
 
 # Solo dependencias de producción
 FROM base AS prod-deps
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 
 # Imagen final

@@ -7,13 +7,14 @@ services:
     image: web-auditor:latest
     ports:
       # Solo local. Quita el "127.0.0.1:" si lo expones directo (mejor tras un proxy)
-      - "localhost:${HOST_PORT:-3000}:3000"
+      - "${HOST_PORT:-3000}:3000"
     environment:
       API_KEY: ${API_KEY}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS}
       MAX_CONCURRENT: ${MAX_CONCURRENT:-2}
     volumes:
       - ./sessions:/app/sessions:ro # sesiones guardadas con `pnpm save-session`
+      - ./src/application/storage/videos:/app/src/application/storage/videos
     init: true # evita procesos zombie de Chromium
     shm_size: "1gb" # memoria compartida para Chromium
     deploy:
