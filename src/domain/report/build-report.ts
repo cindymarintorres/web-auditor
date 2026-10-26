@@ -18,6 +18,12 @@ export interface AuditReport {
   media: MediaSummary;
   interactions: StepResult[];
   console: { errors: string[]; pageErrors: string[] };
+  mediaProcessing?: {
+    success: boolean;
+    file?: string;
+    fileName?: string;
+    error?: string;
+  };
 }
 
 // Solo compone: cada resumen vive en su propio archivo.

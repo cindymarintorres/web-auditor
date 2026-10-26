@@ -8,7 +8,7 @@ const round = (n: number): number => Math.round(n * 10) / 10;
 export class NetworkCollector {
   private readonly startedAt = new Map<Request, number>();
   private readonly records: NetworkRecord[] = [];
-  private readonly manifests: string[] = []; // <---Almacena URLs de manifiestos
+  private readonly manifests: string[] = []; // Almacena URLs completas de manifiestos
 
   constructor(private readonly clean: (url: string) => string) {}
 
@@ -22,19 +22,27 @@ export class NetworkCollector {
       const res = await req.response().catch(() => null);
       const { responseStart } = req.timing();
 
-      const url = req.url();
-      const category = classifyRequest(url, req.resourceType());
+      const rawUrl = req.url();
+      const category = classifyRequest(rawUrl, req.resourceType());
 
-      // <---Si la categoría es manifiesto, lo guardamos limpio
       if (category === "manifest") {
-        const cleanedUrl = this.clean(url);
-        if (!this.manifests.includes(cleanedUrl)) {
-          this.manifests.push(cleanedUrl);
+        const isThumbnailOrPreview =
+          rawUrl.includes("preview") ||
+          rawUrl.includes("thumb") ||
+          rawUrl.includes("small");
+
+        if (!isThumbnailOrPreview && !this.manifests.includes(rawUrl)) {
+          // Prioridad al manifiesto maestro "content.m3u8"
+          if (rawUrl.includes("content.m3u8")) {
+            this.manifests.unshift(rawUrl);
+          } else {
+            this.manifests.push(rawUrl);
+          }
         }
       }
 
       this.records.push({
-        ...this.base(req),
+        ...this.base(req, category, rawUrl),
         status: res?.status() ?? null,
         ttfbMs: responseStart >= 0 ? round(responseStart) : null,
         failed: false,
@@ -43,8 +51,11 @@ export class NetworkCollector {
 
     // Falló de red (DNS, conexión cortada, bloqueada, etc.)
     page.on("requestfailed", (req) => {
+      const rawUrl = req.url();
+      const category = classifyRequest(rawUrl, req.resourceType());
+
       this.records.push({
-        ...this.base(req),
+        ...this.base(req, category, rawUrl),
         status: null,
         ttfbMs: null,
         failed: true,
@@ -56,15 +67,21 @@ export class NetworkCollector {
   result() {
     return {
       records: this.records,
-      manifests: this.manifests, //Retornamos los manifiestos detectados
+      manifests: this.manifests,
     };
   }
 
-  private base(req: Request) {
+  private base(req: Request, category?: string, rawUrl?: string) {
+    const url = rawUrl ?? req.url();
+    const cat = category ?? classifyRequest(url, req.resourceType());
+    // Para los manifiestos preservamos la URL completa (incluyendo tokens como ?bc_token=...)
+    // para que la autenticación sea válida al inspeccionarlos o procesarlos.
+    const finalUrl = cat === "manifest" ? url : this.clean(url);
+
     return {
-      url: this.clean(req.url()),
+      url: finalUrl,
       method: req.method(),
-      category: classifyRequest(req.url(), req.resourceType()),
+      category: cat,
       durationMs: Date.now() - (this.startedAt.get(req) ?? Date.now()),
     };
   }
